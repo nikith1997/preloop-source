@@ -1,0 +1,106 @@
+name: 'Python Format, Lint, Test'
+description: 'Runs CI checks for Python projects'
+
+inputs:
+  python_version:
+    description: 'The Python version to use'
+    required: false
+    default: '3.11'
+    type: string
+  require_tests:
+    description: 'Require tests to pass before publishing'
+    default: true
+    required: false
+    type: boolean
+  use_bot_ssh_key:
+    description: 'Use the SSH key from the git bot account for pulling packages. If true, git_bot_ssh_key must be provided'
+    default: false
+    required: false
+    type: boolean
+  git_bot_ssh_key:
+    description: 'SSH key from the git bot account for pulling packages'
+    required: false
+    type: string
+  make_test_command:
+    description: make command to run for executing tests
+    default: test
+    required: false
+    type: string
+  working_directory:
+    description: working-directory for steps (where Makefile is)
+    default: .
+    required: false
+    type: string
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Install Poetry
+      run: pipx install poetry==1.6.1
+      shell: bash
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python_version }}
+        cache: "poetry"
+
+    - name: Add SSH Key from the git bot account
+      working-directory: ${{ inputs.working_directory }}
+      if: ${{ inputs.use_bot_ssh_key }}
+      run: |
+        SECRET_LOCATION=$PWD/id_rsa
+        echo "${{ inputs.git_bot_ssh_key }}" > $SECRET_LOCATION
+        echo "SECRET_LOCATION=$SECRET_LOCATION" >> $GITHUB_ENV
+        mkdir -p $HOME/.ssh
+        cp $SECRET_LOCATION $HOME/.ssh/id_rsa
+        chmod -R 400 $HOME/.ssh/id_rsa
+        ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+      shell: bash
+
+    - name: "Configure AWS Credentials"
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: "us-east-1" # change to appropriate region
+        role-to-assume: "arn:aws:iam::439101250057:role/github-actions-dev-role"
+        role-session-name: "RepoPublishPackage"
+        role-duration-seconds: 900
+    
+    - name: Install dependencies
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        CODEARTIFACT_DOMAIN_NAME: preloop-artifactory-dev
+        CODEARTIFACT_USER: aws
+        PRELOOP_PRIVATE_REPO: preloop_main
+        PYPI_REPO: pypi-store
+        AWS_DEFAULT_ACCOUNT: 439101250057
+        AWS_DEFAULT_REGION: us-east-1
+        DEPLOY_ENVIRONMENT: dev
+      run: |
+        export CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain $CODEARTIFACT_DOMAIN_NAME --domain-owner $AWS_DEFAULT_ACCOUNT --query authorizationToken --output text)
+        poetry source remove ${PRELOOP_PRIVATE_REPO}
+        poetry source remove ${PYPI_REPO}
+        poetry source add --priority=default ${PRELOOP_PRIVATE_REPO} https://preloop-artifactory-${DEPLOY_ENVIRONMENT}-${AWS_DEFAULT_ACCOUNT}.d.codeartifact.${AWS_DEFAULT_REGION}.amazonaws.com/pypi/${PRELOOP_PRIVATE_REPO}/simple/
+        poetry source add --priority=supplemental ${PYPI_REPO} https://preloop-artifactory-${DEPLOY_ENVIRONMENT}-${AWS_DEFAULT_ACCOUNT}.d.codeartifact.${AWS_DEFAULT_REGION}.amazonaws.com/pypi/${PYPI_REPO}/simple/
+        poetry config http-basic.${PRELOOP_PRIVATE_REPO} ${CODEARTIFACT_USER} ${CODEARTIFACT_AUTH_TOKEN}
+        poetry config http-basic.${PYPI_REPO} ${CODEARTIFACT_USER} ${CODEARTIFACT_AUTH_TOKEN}
+        poetry update --with dev,test
+      shell: bash
+
+    - name: Run format
+      working-directory: ${{ inputs.working_directory }}
+      run: make format-ci
+      shell: bash
+
+    - name: Run Pylint
+      working-directory: ${{ inputs.working_directory }}
+      run: make lint
+      shell: bash
+
+    - name: Run PyTests
+      working-directory: ${{ inputs.working_directory }}
+      # TODO: Excuse me, GitHub composite treats boolean as string - https://github.com/actions/runner/issues/2238
+      # TODO: (2) This is a conditional because newer repos don't have tests yet - Remove once all repos have tests
+      if: ${{ inputs.require_tests == 'true' }}
+      run: make ${{ inputs.make_test_command }}
+      shell: bash

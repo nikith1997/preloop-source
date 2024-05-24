@@ -1,0 +1,63 @@
+[tool.poetry]
+name = "preloop-api"
+
+version = "0.3.112"
+description = "Backend and application API for Preloop"
+authors = ["Preloop, Inc."]
+
+readme = "README.md"
+packages = [{include="src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.102.0"
+uvicorn = {extras = ["standard"], version = "^0.24.0.post1"}
+pydantic = "^2.3.0"
+psycopg = {extras = ["binary", "pool"], version = "^3.1.10"}
+alembic = "^1.11.3"
+pydantic-settings = "^2.0.3"
+psycopg2 = "^2.9.7"
+asyncpg = "^0.28.0"
+python-dotenv = "^1.0.0"
+boto3 = "1.34.33"
+pandas = "^2.0.3"
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+jupyter = "^1.0.0"
+python-multipart = "^0.0.6"
+sqlalchemy = "^2.0.20"
+fastapi-users = {extras = ["oauth", "sqlalchemy"], version = "^12.1.2"}
+docker = "^6.1.3"
+aiofiles = "^23.2.1"
+pyarrow = "^13.0.0"
+sqlparse = "^0.4.4"
+gunicorn = "^21.2.0"
+notebook = "^7.0.6"
+cryptography = "^41.0.7"
+scikit-learn = "^1.4.0"
+preloop-compiler = "^0.2.7"
+nbformat = "^5.9.2"
+nbconvert = "^7.16.1"
+kubernetes = "^29.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pylint = "^3.0.3"
+black = "22.12.0"
+isort = "^5.11.4"
+notebook = "^7.0.2"
+
+
+[[tool.poetry.source]]
+name = "preloop_main"
+url = "https://preloop-artifactory-dev-439101250057.d.codeartifact.us-east-1.amazonaws.com/pypi/preloop_main/simple/"
+priority = "primary"
+
+
+[[tool.poetry.source]]
+name = "pypi-store"
+url = "https://preloop-artifactory-dev-439101250057.d.codeartifact.us-east-1.amazonaws.com/pypi/pypi-store/simple/"
+priority = "supplemental"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

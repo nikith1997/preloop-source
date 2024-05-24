@@ -1,0 +1,25 @@
+# This workflow is used to run the CI tests for the project.
+name: "Create Release"
+
+on:
+  pull_request:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+
+  poetry-versioning:
+    runs-on: ubuntu-latest
+    permissions:
+        contents: write
+    steps:
+      - uses: preloop/devops/.github/actions/poetry-package-versioning@master
+        with:
+          pull_request_head_ref: ${{ github.event.pull_request.head.ref }}
+          pull_request_title: ${{ github.event.pull_request.title }}
+          gh_bot_token: ${{ secrets.PRELOOP_BOT_TOKEN }}
+

@@ -1,0 +1,91 @@
+name: 'Poetry Package Versioning'
+description: 'Versions a Poetry package based on the PR title'
+
+inputs:
+  python_version:
+    description: 'The Python version to use'
+    required: false
+    default: '3.11'
+    type: string
+  pull_request_head_ref:
+    required: true
+    type: string
+  pull_request_title:
+    required: true
+    type: string
+  gh_bot_token:
+    description: 'Token used to create a new release'
+    required: true
+    type: string
+  custom_working_directory:
+    description: 'Override the working directory'
+    required: false
+    default: '.'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.gh_bot_token }}
+
+    - name: Install Poetry
+      run: pipx install poetry==1.6.1
+      shell: bash
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python_version }}
+
+    - name: Checkout master branch
+      uses: actions/checkout@v4
+      with:
+        ref: 'master'
+        token: ${{ inputs.gh_bot_token }}
+
+    # Get latest version from master branch
+    - name: Get latest version from master
+      run: echo "LATEST_VERSION=$(poetry version --short)" >> $GITHUB_ENV
+      working-directory: ${{ inputs.custom_working_directory }}
+      shell: bash
+    
+    # Checkout Feature Branch
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.gh_bot_token }}
+        ref: ${{ inputs.pull_request_head_ref }}
+    
+    - name: Bump version based off master
+      run: poetry version ${{ env.LATEST_VERSION }}
+      working-directory: ${{ inputs.custom_working_directory }}
+      shell: bash
+
+    - name: Update package version
+      run: |
+        TITLE="${{ inputs.pull_request_title }}"
+        PREFIX_TITLE=${TITLE%%:*}
+        if [[ "$PREFIX_TITLE" =~ ^(breaking|BREAKING CHANGE)$ ]]; then
+          poetry version major
+        elif [ "$PREFIX_TITLE" = "feat" ]; then
+          poetry version minor
+        else
+          poetry version patch
+        fi
+      working-directory: ${{ inputs.custom_working_directory }}
+      shell: bash
+
+    - name: Push pyproject.toml with the new version
+      env:
+        GITHUB_TOKEN: ${{ inputs.gh_bot_token }}
+      run: |
+        git config --global user.name preloop-bot
+        git config --global user.email githubbot@preloop.com
+        git add ./pyproject.toml
+        git commit -m "chore: bumped package version"
+        git log
+        git status
+        git push
+      working-directory: ${{ inputs.custom_working_directory }}
+      shell: bash
+      continue-on-error: True

@@ -1,0 +1,37 @@
+# This workflow is used to run the CI tests for the project.
+name: "Test package"
+
+on:
+  pull_request:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/python-checks@master
+        with:
+          require_tests: true
+          use_bot_ssh_key: true
+          git_bot_ssh_key: ${{ secrets.PRELOOP_BOT_SSH }}
+
+  poetry-versioning:
+    runs-on: ubuntu-latest
+    permissions:
+        contents: write
+    steps:
+      - uses: preloop/devops/.github/actions/poetry-package-versioning@master
+        with:
+          pull_request_head_ref: ${{ github.event.pull_request.head.ref }}
+          pull_request_title: ${{ github.event.pull_request.title }}
+          gh_bot_token: ${{ secrets.PRELOOP_BOT_TOKEN }}
+

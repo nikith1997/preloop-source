@@ -1,0 +1,17 @@
+name: Pull Request Conformance 
+
+on:
+  pull_request:
+    types:
+      - edited
+      - opened
+      - reopened
+
+jobs:
+  title-conforms:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/pr-title-conformance@master
+        with:
+          pull_request_title: ${{ github.event.pull_request.title }}

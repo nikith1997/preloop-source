@@ -1,0 +1,13 @@
+
+version: "3.7"
+services:
+  main:
+    build:
+      context: .
+    volumes:
+      - ./preloop:/app/preloop
+    env_file:
+      - ./.env
+    # TODO: update to use the port(s) for your service
+    ports:
+      - "8080:8080"

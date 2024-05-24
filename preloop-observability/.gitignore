@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.egg-info/
+.DS_Store
+.ipynb_checkpoints/
+build/
+dist/
+.env
+*.log
+.vscode/
+.idea
+Dockerfile.tmp
+.python-version
+.pytest_cache
+.venv/
+.env
+coverage

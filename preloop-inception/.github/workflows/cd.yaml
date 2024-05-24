@@ -1,0 +1,68 @@
+# This workflow is used to publish the python package to Artifact Registry.
+name: "Publish Package"
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  publish-package:
+    runs-on: ubuntu-latest
+    environment: development
+    permissions:
+      contents: "read"
+      id-token: "write"
+    outputs:
+      package_version: ${{ steps.package-version.outputs.package_version }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/poetry-package-publishing@master
+        with:
+          aws_region: "us-east-1"
+          role_to_assume: "arn:aws:iam::439101250057:role/github-actions-dev-role"
+          role_session_name: "RepoPublishPackage"
+          role_duration_seconds: 900
+          domain: "preloop-artifactory-dev"
+          domain_owner: "439101250057"
+          repository: "preloop_main"
+          repository_format: "pypi"
+          codeartifact_user: "aws"
+        id: package-version
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [publish-package]
+    permissions:
+      contents: "write"
+      id-token: "write"
+    outputs:
+      package_version: ${{ needs.publish-package.outputs.package_version }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/create-release@master
+        with:
+          gh_bot_token: ${{ secrets.PRELOOP_BOT_TOKEN }}
+          package_version: ${{ needs.publish-package.outputs.package_version }}
+    
+  promote-to-production:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+    needs: [create-release]
+    environment: production
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/poetry-package-publishing@master
+        with:
+          aws_region: "us-east-1"
+          role_to_assume: "arn:aws:iam::695168008693:role/github-actions-prod-role"
+          role_session_name: "RepoPublishPackage"
+          role_duration_seconds: 900
+          domain: "preloop-artifactory-prod"
+          domain_owner: "695168008693"
+          repository: "preloop_main"
+          repository_format: "pypi"
+          codeartifact_user: "aws" 
+

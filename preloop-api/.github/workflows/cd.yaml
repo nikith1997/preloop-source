@@ -1,0 +1,441 @@
+name: "Deploy API"
+on:
+  push:
+    branches:
+      - master
+jobs:
+
+  start-runner-dev: #start the ec2 runner for DB migrations
+    name: Start self-hosted EC2 runner for DB migrations on Dev
+    environment: development
+    permissions:
+      contents: "read"
+      id-token: "write"
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::439101250057:role/github-actions-dev-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 1800
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.PRELOOP_BOT_AWS_RUNNER_TOKEN }}
+          ec2-image-id: ${{ vars.EC2_IMAGE_ID }}
+          ec2-instance-type: t3.xlarge
+          subnet-id: subnet-009fe122d9c929a3b
+          security-group-id: sg-0a45f1c7db55d37b9
+
+  run-migrations-dev:
+    name: Run alembic migrations for dev
+    needs: start-runner-dev # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner-dev.outputs.label }} # run the job on the newly created runner
+    environment: development
+    permissions:
+      contents: "read"
+      id-token: "write"
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup pyenv
+        uses: "gabrielfalcao/pyenv-action@v18"
+        with:
+            default: 3.11
+      - name: Install Poetry
+        run: |
+            pyenv install 3.11
+            pyenv local 3.11
+            pip install poetry
+        shell: bash
+      - name: Install AWS CLI
+        run: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            ./aws/install
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::439101250057:role/github-actions-dev-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 900
+      - name: Run alembic migrations
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
+          PRELOOP_DATASTORE_URL: ${{ secrets.PRELOOP_DATASTORE_URL }}
+          AWS_ACCOUNT_ID: 439101250057
+          AWS_DEFAULT_REGION: us-east-1
+          DEPLOY_ENVIRONMENT: dev
+          CODEARTIFACT_DOMAIN_NAME: preloop-artifactory-dev
+        run: |
+          export CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain $CODEARTIFACT_DOMAIN_NAME --domain-owner $AWS_ACCOUNT_ID --query authorizationToken --output text)
+          export PRELOOP_PRIVATE_REPO=preloop_main
+          export PYPI_REPO=pypi-store
+          export CODEARTIFACT_USER=aws
+          poetry source remove ${PRELOOP_PRIVATE_REPO}
+          poetry source remove ${PYPI_REPO}
+          poetry source add --priority=default ${PRELOOP_PRIVATE_REPO} https://preloop-artifactory-${DEPLOY_ENVIRONMENT}-${AWS_ACCOUNT_ID}.d.codeartifact.${AWS_DEFAULT_REGION}.amazonaws.com/pypi/${PRELOOP_PRIVATE_REPO}/simple/
+          poetry source add --priority=supplemental ${PYPI_REPO} https://preloop-artifactory-${DEPLOY_ENVIRONMENT}-${AWS_ACCOUNT_ID}.d.codeartifact.${AWS_DEFAULT_REGION}.amazonaws.com/pypi/${PYPI_REPO}/simple/
+          poetry config http-basic.${PRELOOP_PRIVATE_REPO} ${CODEARTIFACT_USER} ${CODEARTIFACT_AUTH_TOKEN}
+          poetry config http-basic.${PYPI_REPO} ${CODEARTIFACT_USER} ${CODEARTIFACT_AUTH_TOKEN}
+          pyenv local 3.11
+          poetry update
+          poetry run alembic upgrade head
+
+  stop-runner-dev:
+    name: Stop self-hosted EC2 runner on Dev
+    needs:
+      - start-runner-dev # required to get output from the start-runner job
+      - run-migrations-dev # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+    environment: development
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::439101250057:role/github-actions-dev-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 900
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.PRELOOP_BOT_AWS_RUNNER_TOKEN }}
+          label: ${{ needs.start-runner-dev.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner-dev.outputs.ec2-instance-id }}
+
+  start-runner-prod: #start the ec2 runner for DB migrations
+    name: Start self-hosted EC2 runner for DB migrations on Prod
+    environment: production
+    needs: [stop-runner-dev]
+    permissions:
+      contents: "read"
+      id-token: "write"
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::695168008693:role/github-actions-prod-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 900
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.PRELOOP_BOT_AWS_RUNNER_TOKEN }}
+          ec2-image-id: ${{ vars.EC2_IMAGE_ID }}
+          ec2-instance-type: t3.xlarge
+          subnet-id: subnet-0800b2a809dc0464e
+          security-group-id: sg-08da54265ed759272
+
+  run-migrations-prod:
+    name: Run alembic migrations for prod
+    needs: start-runner-prod # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner-prod.outputs.label }} # run the job on the newly created runner
+    environment: production
+    permissions:
+      contents: "read"
+      id-token: "write"
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup pyenv
+        uses: "gabrielfalcao/pyenv-action@v18"
+        with:
+            default: 3.11
+      - name: Install Poetry
+        run: |
+            pyenv install 3.11
+            pyenv local 3.11
+            pip install poetry
+        shell: bash
+      - name: Install AWS CLI
+        run: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            ./aws/install
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::695168008693:role/github-actions-prod-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 900
+      - name: Run alembic migrations
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
+          PRELOOP_DATASTORE_URL: ${{ secrets.PRELOOP_DATASTORE_URL }}
+          AWS_ACCOUNT_ID: 695168008693
+          AWS_DEFAULT_REGION: us-east-1
+          DEPLOY_ENVIRONMENT: prod
+          CODEARTIFACT_DOMAIN_NAME: preloop-artifactory-prod
+        run: |
+          export CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain $CODEARTIFACT_DOMAIN_NAME --domain-owner $AWS_ACCOUNT_ID --query authorizationToken --output text)
+          export PRELOOP_PRIVATE_REPO=preloop_main
+          export PYPI_REPO=pypi-store
+          export CODEARTIFACT_USER=aws
+          poetry source remove ${PRELOOP_PRIVATE_REPO}
+          poetry source remove ${PYPI_REPO}
+          poetry source add --priority=default ${PRELOOP_PRIVATE_REPO} https://preloop-artifactory-${DEPLOY_ENVIRONMENT}-${AWS_ACCOUNT_ID}.d.codeartifact.${AWS_DEFAULT_REGION}.amazonaws.com/pypi/${PRELOOP_PRIVATE_REPO}/simple/
+          poetry source add --priority=supplemental ${PYPI_REPO} https://preloop-artifactory-${DEPLOY_ENVIRONMENT}-${AWS_ACCOUNT_ID}.d.codeartifact.${AWS_DEFAULT_REGION}.amazonaws.com/pypi/${PYPI_REPO}/simple/
+          poetry config http-basic.${PRELOOP_PRIVATE_REPO} ${CODEARTIFACT_USER} ${CODEARTIFACT_AUTH_TOKEN}
+          poetry config http-basic.${PYPI_REPO} ${CODEARTIFACT_USER} ${CODEARTIFACT_AUTH_TOKEN}
+          pyenv local 3.11
+          poetry update
+          poetry run alembic upgrade head
+
+  stop-runner-prod:
+    name: Stop self-hosted EC2 runner on Pord
+    needs:
+      - start-runner-prod # required to get output from the start-runner job
+      - run-migrations-prod # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+    environment: production
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::695168008693:role/github-actions-prod-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 1800
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.PRELOOP_BOT_AWS_RUNNER_TOKEN }}
+          label: ${{ needs.start-runner-prod.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner-prod.outputs.ec2-instance-id }}
+
+  deploy-to-dev:
+    runs-on: ubuntu-latest
+    env:
+      CDK_DEFAULT_ACCOUNT: 439101250057
+      CDK_DEFAULT_REGION: us-east-1
+      DEPLOY_ENVIRONMENT: dev
+    environment: development
+    permissions:
+      contents: "read"
+      id-token: "write"
+    outputs:
+      deployment-version: ${{ steps.deployment-version.outputs.PACKAGE_VERSION }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/setup-python-and-poetry@master
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::439101250057:role/github-actions-dev-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 900
+          
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and Push Preloop Backend Image
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: preloop-backend
+          IMAGE_TAG: ${{ github.sha }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
+          PRELOOP_DATASTORE_URL: ${{ secrets.PRELOOP_DATASTORE_URL }}
+          CODEARTIFACT_DOMAIN_NAME: preloop-artifactory-dev
+          COMPUTE_SUBNET_1: subnet-03872d14c29663da3
+          COMPUTE_SUBNET_2: subnet-009fe122d9c929a3b
+          PUBLIC_SUBNET_1: subnet-0068c492af521835d
+          PUBLIC_SUBNET_2: subnet-0472f2d884dcca907
+          VPC_ID: vpc-008bc983468a9ea78
+          MODEL_ENDPOINT_LOAD_BALANCER_SECURITY_GROUP: sg-0501d179322ba78e4
+        run: |
+          export CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain $CODEARTIFACT_DOMAIN_NAME --domain-owner $CDK_DEFAULT_ACCOUNT --query authorizationToken --output text)
+          export PRELOOP_API_KEY_INTERNAL_SECRET_ENCRYPTION_KEY=$(aws secretsmanager get-secret-value --secret-id ${DEPLOY_ENVIRONMENT}/PreloopApiKeyInternalSecretEncryptionKey --output text --query "SecretString")
+          export PRELOOP_USER_SCRIPT_ENV_VARS_ENCRYPTION_KEY=$(aws secretsmanager get-secret-value --secret-id ${DEPLOY_ENVIRONMENT}/preloop/UserScriptEnvVarsEncryptionKey --output text --query "SecretString")
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+          --build-arg DATABASE_URL=$DATABASE_URL \
+          --build-arg DATABASE_URL_ASYNC=$DATABASE_URL_ASYNC \
+          --build-arg PRELOOP_DATASTORE_URL=$PRELOOP_DATASTORE_URL \
+          --build-arg CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN \
+          --build-arg DEPLOY_ENVIRONMENT=$DEPLOY_ENVIRONMENT \
+          --build-arg AWS_DEFAULT_REGION=$CDK_DEFAULT_REGION \
+          --build-arg AWS_ACCOUNT_ID=$CDK_DEFAULT_ACCOUNT \
+          --build-arg COMPUTE_SUBNET_1=$COMPUTE_SUBNET_1 \
+          --build-arg COMPUTE_SUBNET_2=$COMPUTE_SUBNET_2 \
+          --build-arg PUBLIC_SUBNET_1=$PUBLIC_SUBNET_1 \
+          --build-arg PUBLIC_SUBNET_2=$PUBLIC_SUBNET_2 \
+          --build-arg VPC_ID=$VPC_ID \
+          --build-arg MODEL_ENDPOINT_LOAD_BALANCER_SECURITY_GROUP=$MODEL_ENDPOINT_LOAD_BALANCER_SECURITY_GROUP \
+          --build-arg PRELOOP_USER_SCRIPT_ENV_VARS_ENCRYPTION_KEY=$PRELOOP_USER_SCRIPT_ENV_VARS_ENCRYPTION_KEY \
+          --build-arg PRELOOP_API_KEY_INTERNAL_SECRET_ENCRYPTION_KEY=$PRELOOP_API_KEY_INTERNAL_SECRET_ENCRYPTION_KEY .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+      
+      - name: Download task definition
+        run: |
+          aws ecs describe-task-definition --task-definition preloop-backend-task-definition --query taskDefinition > task-definition.json
+      
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: preloop-backend
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: backend-service-load-balanced
+          cluster: preloop-backend-cluster
+          wait-for-service-stability: true
+      
+      - name: Get Deployment Version
+        id: deployment-version
+        run: echo "PACKAGE_VERSION=$(poetry version --short)" >> "$GITHUB_OUTPUT"
+        working-directory: .
+        shell: bash
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [deploy-to-dev]
+    permissions:
+      contents: "write"
+      id-token: "write"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/create-release@master
+        with:
+          gh_bot_token: ${{ secrets.PRELOOP_BOT_TOKEN }}
+          package_version: ${{ needs.deploy-to-dev.outputs.deployment-version }}
+  
+  deploy-to-prod:
+    runs-on: ubuntu-latest
+    env:
+      CDK_DEFAULT_ACCOUNT: 695168008693
+      CDK_DEFAULT_REGION: us-east-1
+      DEPLOY_ENVIRONMENT: prod
+    needs: [create-release]
+    environment: production
+    permissions:
+      contents: "read"
+      id-token: "write"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/setup-python-and-poetry@master
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+            
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::695168008693:role/github-actions-prod-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 900
+          
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and Push Preloop Backend Image
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: preloop-backend
+          IMAGE_TAG: ${{ github.sha }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
+          PRELOOP_DATASTORE_URL: ${{ secrets.PRELOOP_DATASTORE_URL }}
+          CODEARTIFACT_DOMAIN_NAME: preloop-artifactory-prod
+          COMPUTE_SUBNET_1: subnet-09049041d8952a778
+          COMPUTE_SUBNET_2: subnet-0800b2a809dc0464e
+          PUBLIC_SUBNET_1: subnet-0f2683a8956c9b0c3
+          PUBLIC_SUBNET_2: subnet-05474ae05be2ce38c
+          VPC_ID: vpc-010c691b9b7469841
+          MODEL_ENDPOINT_LOAD_BALANCER_SECURITY_GROUP: sg-058d8bb7f0ec45a7a
+          MODEL_ENDPOINT_LOAD_BALANCER_CERTIFICATE_ARN: arn:aws:acm:us-east-1:695168008693:certificate/6dd8fdec-6e21-4639-b5f3-edf3c1ad6d6b
+          MODEL_ENDPOINT_ROUTE_53_HOSTED_ZONE_ID: Z10226751KEN1V1O25YXT
+        run: |
+          export CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain $CODEARTIFACT_DOMAIN_NAME --domain-owner $CDK_DEFAULT_ACCOUNT --query authorizationToken --output text)
+          export PRELOOP_API_KEY_INTERNAL_SECRET_ENCRYPTION_KEY=$(aws secretsmanager get-secret-value --secret-id ${DEPLOY_ENVIRONMENT}/PreloopApiKeyInternalSecretEncryptionKey --output text --query "SecretString")
+          export PRELOOP_USER_SCRIPT_ENV_VARS_ENCRYPTION_KEY=$(aws secretsmanager get-secret-value --secret-id ${DEPLOY_ENVIRONMENT}/preloop/UserScriptEnvVarsEncryptionKey --output text --query "SecretString")
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+          --build-arg DATABASE_URL=$DATABASE_URL \
+          --build-arg DATABASE_URL_ASYNC=$DATABASE_URL_ASYNC \
+          --build-arg PRELOOP_DATASTORE_URL=$PRELOOP_DATASTORE_URL \
+          --build-arg CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN \
+          --build-arg DEPLOY_ENVIRONMENT=$DEPLOY_ENVIRONMENT \
+          --build-arg AWS_DEFAULT_REGION=$CDK_DEFAULT_REGION \
+          --build-arg AWS_ACCOUNT_ID=$CDK_DEFAULT_ACCOUNT \
+          --build-arg COMPUTE_SUBNET_1=$COMPUTE_SUBNET_1 \
+          --build-arg COMPUTE_SUBNET_2=$COMPUTE_SUBNET_2 \
+          --build-arg PUBLIC_SUBNET_1=$PUBLIC_SUBNET_1 \
+          --build-arg PUBLIC_SUBNET_2=$PUBLIC_SUBNET_2 \
+          --build-arg VPC_ID=$VPC_ID \
+          --build-arg MODEL_ENDPOINT_LOAD_BALANCER_SECURITY_GROUP=$MODEL_ENDPOINT_LOAD_BALANCER_SECURITY_GROUP \
+          --build-arg MODEL_ENDPOINT_LOAD_BALANCER_CERTIFICATE_ARN=$MODEL_ENDPOINT_LOAD_BALANCER_CERTIFICATE_ARN \
+          --build-arg MODEL_ENDPOINT_ROUTE_53_HOSTED_ZONE_ID=$MODEL_ENDPOINT_ROUTE_53_HOSTED_ZONE_ID \
+          --build-arg PRELOOP_USER_SCRIPT_ENV_VARS_ENCRYPTION_KEY=$PRELOOP_USER_SCRIPT_ENV_VARS_ENCRYPTION_KEY \
+          --build-arg PRELOOP_API_KEY_INTERNAL_SECRET_ENCRYPTION_KEY=$PRELOOP_API_KEY_INTERNAL_SECRET_ENCRYPTION_KEY .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+      
+      - name: Download task definition
+        run: |
+          aws ecs describe-task-definition --task-definition preloop-backend-task-definition --query taskDefinition > task-definition.json
+      
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: preloop-backend
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: backend-service-load-balanced
+          cluster: preloop-backend-cluster
+          wait-for-service-stability: true

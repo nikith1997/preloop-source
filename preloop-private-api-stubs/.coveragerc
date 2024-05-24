@@ -1,0 +1,6 @@
+[run]
+parallel=True
+data_file=/tmp/.coverage
+omit =
+    *_test.py
+    *__init__*

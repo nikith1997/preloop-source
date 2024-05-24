@@ -1,0 +1,212 @@
+[tool.poetry]
+name = "preloop-observability"
+version = "0.2.13"
+
+description = "This package implements all the logic that's required for both model and operational observability."
+authors = ["Tejas Hosangadi <tejas@preloop.com>"]
+readme = "README.md"
+packages = [{include = "preloop/observability"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+preloop-compiler = "^0.2.15"
+xgboost = "^2.0.3"
+scikit-learn = "^1.4.1.post1"
+requests = "^2.31.0"
+pydantic = "^2.6.3"
+pandas = "^2.2.1"
+
+[tool.poetry.group.dev]
+optional=true
+
+[tool.poetry.group.dev.dependencies]
+numpy = "^1.22.3"
+black = "22.12.0"
+isort = "^5.11.4"
+
+
+[tool.poetry.group.test]
+optional=true
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.2.0"
+pytest-asyncio = "^0.20.3"
+pytest-cov = "^4.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[[tool.poetry.source]]
+name = "preloop_main"
+url = "https://preloop-artifactory-dev-439101250057.d.codeartifact.us-east-1.amazonaws.com/pypi/preloop_main/simple/"
+priority = "default"
+
+
+[[tool.poetry.source]]
+name = "pypi-store"
+url = "https://preloop-artifactory-dev-439101250057.d.codeartifact.us-east-1.amazonaws.com/pypi/pypi-store/simple/"
+priority = "supplemental"
+
+
+[tool.black]
+extend-exclude='''
+^/src/alembic/versions/*\.py
+'''
+line-length=120
+
+
+[tool.isort]
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 120
+profile = "black"
+extend_skip = ".pyenv"
+src_paths = [""]
+known_first_party = ["preloop"]
+
+
+[tool.pylint.main]
+persistent = true
+jobs = 4
+unsafe-load-any-extension = false
+extension-pkg-whitelist = [""]
+
+
+[tool.pylint.messages_control]
+disable = [
+    "locally-disabled",
+    "missing-docstring",
+    "fixme",
+    "broad-except",  
+    "too-many-locals",  
+    "too-many-arguments", 
+    "too-many-statements",  
+    "logging-fstring-interpolation",
+    "useless-suppression",
+    "suppressed-message",
+    "too-few-public-methods",
+    # "wrong-import-order", # Maybe?
+    "missing-timeout", # Maybe?
+    ]
+
+
+[tool.pylint.reports]
+output-format = "text"
+reports = false
+evaluation = "10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)"
+
+
+[tool.pylint.format]
+max-line-length = 120
+ignore-long-lines = "^\\s*(# )?<?https?://\\S+>?$"
+single-line-if-stmt = false
+max-module-lines = 1000
+indent-string = "    "
+indent-after-paren = 4
+
+
+[tool.pylint.spelling]
+spelling-store-unknown-words = false
+
+
+[tool.pylint.logging]
+logging-modules = "logging"
+
+
+[tool.pylint.basic]
+
+
+good-names =  [
+	"i",
+	"j",
+	"k",
+	"e",
+	"s",
+	"_",
+	"fd",
+	"fp",
+	"df"
+]
+bad-names = [
+	"foo",
+	"bar",
+	"baz",
+	"toto",
+	"tutu",
+	"tata"
+]
+
+include-naming-hint = false
+function-rgx = "[a-zA-Z_][a-zA-Z0-9_]{2,40}$"
+variable-rgx = "[a-z_][a-z0-9_]{2,30}$"
+const-rgx = "(([a-zA-Z_][a-zA-Z0-9_]*)|(__.*__))$"
+attr-rgx = "[a-z_][a-z0-9_]{2,30}$"
+argument-rgx = "[a-z_][a-z0-9_]{2,30}$"
+class-attribute-rgx = "([A-Za-z_][A-Za-z0-9_]{2,40}|(__.*__))$"
+inlinevar-rgx = "[A-Za-z_][A-Za-z0-9_]*$"
+class-rgx = "[a-zA-Z_][a-zA-Z0-9]+$"
+module-rgx = "(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$"
+method-rgx = "[a-zA-Z_][a-zA-Z0-9_]{2,40}$"
+no-docstring-rgx = "^_"
+docstring-min-length = -1
+
+[tool.pylint.elif]
+max-nested-blocks = 5
+
+
+[tool.pylint.similarities]
+min-similarity-lines = 1000
+ignore-comments = true
+ignore-docstrings = true
+ignore-imports = true
+
+
+[tool.pylint.typecheck]
+ignore-mixin-members = true
+ignored-modules = ["sqlalchemy"]
+
+[tool.pylint.miscellaneous]
+notes = ["FIXME", "XXX", "TODO" ]
+
+
+[tool.pylint.variables]
+init-import = false
+dummy-variables-rgx = "_$|dummy"
+callbacks =  ["cb_", "_cb"]
+
+
+[tool.pylint.classes]
+defining-attr-methods = ["__init__", "__new__", "setUp"]
+valid-classmethod-first-arg = "cls"
+valid-metaclass-classmethod-first-arg = "mcs"
+exclude-protected = ["_asdict", "_fields", "_replace", "_source", "_make"]
+
+
+[tool.pylint.design]
+max-args = 5
+ignored-argument-names = "_.*"
+max-locals = 20
+max-returns = 6
+max-branches = 12
+max-statements = 50
+max-parents = 7
+max-attributes = 7
+min-public-methods = 2
+max-public-methods = 20
+max-bool-expr = 5
+
+[tool.pylint.imports]
+deprecated-modules = [
+	"regsub",
+	"TERMIOS",
+	"Bastion",
+	"rexec"
+]
+
+[tool.pylint.exceptions]
+overgeneral-exceptions = "Exception"

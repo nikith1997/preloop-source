@@ -1,0 +1,233 @@
+{
+  "availability-zones:account=439101250057:region=us-east-1": [
+    "us-east-1a",
+    "us-east-1b",
+    "us-east-1c",
+    "us-east-1d",
+    "us-east-1e",
+    "us-east-1f"
+  ],
+  "vpc-provider:account=439101250057:filter.tag:Name=vpc-preloop:region=us-east-1:returnAsymmetricSubnets=true": {
+    "vpcId": "vpc-008bc983468a9ea78",
+    "vpcCidrBlock": "192.168.0.0/16",
+    "ownerAccountId": "439101250057",
+    "availabilityZones": [],
+    "subnetGroups": [
+      {
+        "name": "Compute",
+        "type": "Private",
+        "subnets": [
+          {
+            "subnetId": "subnet-03872d14c29663da3",
+            "cidr": "192.168.32.0/20",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-02d688c821495a0f1"
+          },
+          {
+            "subnetId": "subnet-009fe122d9c929a3b",
+            "cidr": "192.168.48.0/20",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-07123b62523f17dfb"
+          }
+        ]
+      },
+      {
+        "name": "Public",
+        "type": "Public",
+        "subnets": [
+          {
+            "subnetId": "subnet-0068c492af521835d",
+            "cidr": "192.168.0.0/20",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-0a87f158efe266486"
+          },
+          {
+            "subnetId": "subnet-0472f2d884dcca907",
+            "cidr": "192.168.16.0/20",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-0373ce70a4e00385c"
+          }
+        ]
+      },
+      {
+        "name": "Data",
+        "type": "Isolated",
+        "subnets": [
+          {
+            "subnetId": "subnet-0407192c77f391f3a",
+            "cidr": "192.168.64.0/20",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-0722422d2192b16b7"
+          },
+          {
+            "subnetId": "subnet-08015144e72307215",
+            "cidr": "192.168.80.0/20",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-09d3aebe23e5dd649"
+          }
+        ]
+      }
+    ]
+  },
+  "availability-zones:account=695168008693:region=us-east-1": [
+    "us-east-1a",
+    "us-east-1b",
+    "us-east-1c",
+    "us-east-1d",
+    "us-east-1e",
+    "us-east-1f"
+  ],
+  "vpc-provider:account=695168008693:filter.tag:Name=vpc-preloop:region=us-east-1:returnAsymmetricSubnets=true": {
+    "vpcId": "vpc-010c691b9b7469841",
+    "vpcCidrBlock": "192.168.0.0/16",
+    "ownerAccountId": "695168008693",
+    "availabilityZones": [],
+    "subnetGroups": [
+      {
+        "name": "Compute",
+        "type": "Private",
+        "subnets": [
+          {
+            "subnetId": "subnet-09049041d8952a778",
+            "cidr": "192.168.32.0/20",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-080a493516fabc9e6"
+          },
+          {
+            "subnetId": "subnet-0800b2a809dc0464e",
+            "cidr": "192.168.48.0/20",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-08236ff62107de08c"
+          }
+        ]
+      },
+      {
+        "name": "Public",
+        "type": "Public",
+        "subnets": [
+          {
+            "subnetId": "subnet-0f2683a8956c9b0c3",
+            "cidr": "192.168.0.0/20",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-022127571061fce12"
+          },
+          {
+            "subnetId": "subnet-05474ae05be2ce38c",
+            "cidr": "192.168.16.0/20",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-08de0fe57447de184"
+          }
+        ]
+      },
+      {
+        "name": "Data",
+        "type": "Isolated",
+        "subnets": [
+          {
+            "subnetId": "subnet-0396a455cad853f8f",
+            "cidr": "192.168.64.0/20",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-084b1f73a53dd81fa"
+          },
+          {
+            "subnetId": "subnet-0a66bb0550eccf293",
+            "cidr": "192.168.80.0/20",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-051ee7dbccc1fd4a1"
+          }
+        ]
+      }
+    ]
+  },
+  "ssm:account=695168008693:parameterName=/preloop/frontend/load-balancer-arn:region=us-east-1": "arn:aws:elasticloadbalancing:us-east-1:695168008693:loadbalancer/app/FrontE-Front-uVL4WV9IYAVx/b73e9ceb99d910ae",
+  "load-balancer:account=695168008693:loadBalancerArn=arn$:aws$:elasticloadbalancing$:us-east-1$:695168008693$:loadbalancer/app/FrontE-Front-uVL4WV9IYAVx/b73e9ceb99d910ae:loadBalancerType=application:region=us-east-1": {
+    "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:695168008693:loadbalancer/app/FrontE-Front-uVL4WV9IYAVx/b73e9ceb99d910ae",
+    "loadBalancerCanonicalHostedZoneId": "Z35SXDOTRQ7X7K",
+    "loadBalancerDnsName": "FrontE-Front-uVL4WV9IYAVx-649429779.us-east-1.elb.amazonaws.com",
+    "vpcId": "vpc-010c691b9b7469841",
+    "securityGroupIds": [
+      "sg-066cf4a7e415e0622"
+    ],
+    "ipAddressType": "ipv4"
+  },
+  "vpc-provider:account=695168008693:filter.vpc-id=vpc-010c691b9b7469841:region=us-east-1:returnAsymmetricSubnets=true": {
+    "vpcId": "vpc-010c691b9b7469841",
+    "vpcCidrBlock": "192.168.0.0/16",
+    "ownerAccountId": "695168008693",
+    "availabilityZones": [],
+    "subnetGroups": [
+      {
+        "name": "Compute",
+        "type": "Private",
+        "subnets": [
+          {
+            "subnetId": "subnet-09049041d8952a778",
+            "cidr": "192.168.32.0/20",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-080a493516fabc9e6"
+          },
+          {
+            "subnetId": "subnet-0800b2a809dc0464e",
+            "cidr": "192.168.48.0/20",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-08236ff62107de08c"
+          }
+        ]
+      },
+      {
+        "name": "Public",
+        "type": "Public",
+        "subnets": [
+          {
+            "subnetId": "subnet-0f2683a8956c9b0c3",
+            "cidr": "192.168.0.0/20",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-022127571061fce12"
+          },
+          {
+            "subnetId": "subnet-05474ae05be2ce38c",
+            "cidr": "192.168.16.0/20",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-08de0fe57447de184"
+          }
+        ]
+      },
+      {
+        "name": "Data",
+        "type": "Isolated",
+        "subnets": [
+          {
+            "subnetId": "subnet-0396a455cad853f8f",
+            "cidr": "192.168.64.0/20",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-084b1f73a53dd81fa"
+          },
+          {
+            "subnetId": "subnet-0a66bb0550eccf293",
+            "cidr": "192.168.80.0/20",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-051ee7dbccc1fd4a1"
+          }
+        ]
+      }
+    ]
+  },
+  "security-group:account=695168008693:region=us-east-1:securityGroupId=sg-066cf4a7e415e0622": {
+    "securityGroupId": "sg-066cf4a7e415e0622",
+    "allowAllOutbound": false
+  },
+  "load-balancer-listener:account=695168008693:listenerPort=80:loadBalancerArn=arn$:aws$:elasticloadbalancing$:us-east-1$:695168008693$:loadbalancer/app/FrontE-Front-uVL4WV9IYAVx/b73e9ceb99d910ae:loadBalancerType=application:region=us-east-1": {
+    "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:695168008693:listener/app/FrontE-Front-uVL4WV9IYAVx/b73e9ceb99d910ae/6f687459c7f4e248",
+    "listenerPort": 80,
+    "securityGroupIds": [
+      "sg-066cf4a7e415e0622"
+    ]
+  },
+  "load-balancer-listener:account=695168008693:listenerPort=443:loadBalancerArn=arn$:aws$:elasticloadbalancing$:us-east-1$:695168008693$:loadbalancer/app/FrontE-Front-uVL4WV9IYAVx/b73e9ceb99d910ae:loadBalancerType=application:region=us-east-1": {
+    "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:695168008693:listener/app/FrontE-Front-uVL4WV9IYAVx/b73e9ceb99d910ae/bf0a4e409f3dd0cd",
+    "listenerPort": 443,
+    "securityGroupIds": [
+      "sg-066cf4a7e415e0622"
+    ]
+  }
+}

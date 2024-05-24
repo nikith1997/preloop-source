@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "preloop-execution-engine-lambda"
+version = "0.2.1"
+description = "Lambda function to invoke the step function for the execution engine."
+authors = ["Tejas Hosangadi <tejas@preloop.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+boto3 = "^1.29.3"
+preloop-sdk = "^0.2.37"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

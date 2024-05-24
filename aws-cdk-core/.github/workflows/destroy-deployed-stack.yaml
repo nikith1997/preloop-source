@@ -1,0 +1,54 @@
+name: "Destroy Deployed Stack"
+
+on: 
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "The environment to target for destruction."
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+  
+jobs:
+  check-env:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Set env variable based on development or production
+        id: set-env
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            echo "ENVIRONMENT=arn:aws:iam::439101250057:role/github-actions-dev-role" >> "$GITHUB_ENV"
+          elif [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            echo "ENVIRONMENT=arn:aws:iam::695168008693:role/github-actions-prod-role" >> "$GITHUB_ENV"
+          fi
+        shell: bash
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/setup-python-and-poetry@master
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      
+      - name: "Install dependencies"
+        run: |
+          poetry install
+          npm install -g aws-cdk
+      
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: ${{ env.ENVIRONMENT }}
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 900
+
+      - name: Destroy Stack
+        run: |
+          cdk destroy --force --all
+
+    
+

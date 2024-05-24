@@ -1,0 +1,38 @@
+name: "Pull Request Title Conformance"
+description: "Ensures Pull Requests have conformant titles"
+inputs:
+  pull_request_title:
+    description: "The title of the pull request"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: "title prefix and suffix match"
+      env:
+        TITLE: "${{ inputs.pull_request_title }}"
+        PREFIX: '^(BREAKING CHANGE|fix|feat|chore|docs|refactor|test)(\(.*\))?:|^(Configure Renovate)$'
+        SUFFIX: '\[((sc)-([0-9]+)|no ticket)\]$'
+      shell: bash
+      run: |
+        errors=0
+        if [[ $TITLE == "Configure Renovate" ]]; then
+          exit 0
+        else
+          if ! [[ $TITLE =~ $PREFIX ]]; then
+            echo 'ERROR: The title of your pull request must be prefixed with a conventional commit tag. See https://www.conventionalcommits.org/en/v1.0.0/ for more information'
+            errors+=1
+          fi
+          if ! [[ $TITLE =~ $SUFFIX ]]; then 
+            echo 'ERROR: The title of your pull request must contain in square brackets either: the shortcut/jira ticket number or "no ticket" to declare that it does not have a related ticket.'
+            echo '  Example: "fix: Fix the display on the page [sc-12345] where 12345 is a shortcut ticket number.'
+            echo '  Example: "chore: Enable debug logging [no ticket]'
+            errors+=1
+          fi
+          if [[ $errors -gt 0 ]]; then
+            exit 1
+          fi
+        fi

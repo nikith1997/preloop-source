@@ -1,0 +1,98 @@
+name: 'Poetry Package Publishing'
+description: 'Publishes a Python package to Preloop Artifact'
+inputs:
+  python_version:
+    description: 'The Python version to use'
+    required: false
+    default: '3.11'
+    type: string
+  custom_working_directory:
+    description: 'Override the working directory'
+    required: false
+    default: '.'
+  aws_region:
+    description: 'The AWS region to use'
+    default: 'us-east-1'
+    type: string
+  role_to_assume:
+    description: 'The role that will be assumed'
+    type: string
+    required: true
+  role_session_name:
+    description: 'The name of the session'
+    type: string
+    required: true
+  role_duration_seconds:
+    description: 'The duration of the session'
+    type: integer
+    required: true
+  domain: 
+    description: 'The domain of the repository'
+    type: string
+    required: true
+  domain_owner: 
+    description: 'The owner of the domain'
+    type: string
+    required: true
+  repository:
+    description: 'The name of the repository'
+    type: string
+    required: true
+  repository_format:
+    description: 'The format of the repository'
+    type: string
+    required: true
+  codeartifact_user:
+    description: 'The user to use for CodeArtifact'
+    type: string
+    required: false
+    default: 'aws'
+outputs:
+  package_version:
+    description: 'The version of the package that was published'
+    value: ${{ steps.package_version.outputs.PACKAGE_VERSION }}    
+runs:
+  using: "composite"
+  steps:
+
+  - name: Configure AWS credentials
+    uses: aws-actions/configure-aws-credentials@v4
+    with:
+      aws-region: ${{ inputs.aws_region }} # change to appropriate region
+      role-to-assume: ${{ inputs.role_to_assume }}
+      role-session-name: ${{ inputs.role_session_name }}
+      role-duration-seconds: ${{ inputs.role_duration_seconds }}
+
+  - name: Install Poetry
+    run: pipx install poetry==1.6.1
+    shell: bash
+
+  - uses: actions/setup-python@v4
+    with:
+      python-version: ${{ inputs.python_version }}
+      cache: "poetry"
+
+  - name: Get package version
+    id: package_version
+    run: echo "PACKAGE_VERSION=$(poetry version --short)" >> "$GITHUB_OUTPUT"
+    working-directory: ${{ inputs.custom_working_directory }}
+    shell: bash
+      
+  - name: Publish to Artifact Registry
+    run: |
+      export CODEARTIFACT_REPOSITORY_URL=`aws codeartifact get-repository-endpoint --domain $DOMAIN --domain-owner $DOMAIN_OWNER --repository $REPOSITORY --format $REPOSITORY_FORMAT --query repositoryEndpoint --output text`
+      export CODEARTIFACT_AUTH_TOKEN=`aws codeartifact get-authorization-token --domain $DOMAIN --domain-owner $DOMAIN_OWNER --query authorizationToken --output text`
+      export CODEARTIFACT_USER=$CODEARTIFACT_USER
+
+      poetry config repositories.preloop-dev $CODEARTIFACT_REPOSITORY_URL
+      poetry config http-basic.preloop-dev $CODEARTIFACT_USER $CODEARTIFACT_AUTH_TOKEN
+
+      poetry publish --build -r preloop-dev
+    working-directory: ${{ inputs.custom_working_directory }}
+    env:
+      DOMAIN: ${{ inputs.domain }}
+      DOMAIN_OWNER: ${{ inputs.domain_owner }}
+      REPOSITORY: ${{ inputs.repository }}
+      REPOSITORY_FORMAT: ${{ inputs.repository_format }}
+      CODEARTIFACT_USER: ${{ inputs.codeartifact_user }}
+    shell: bash

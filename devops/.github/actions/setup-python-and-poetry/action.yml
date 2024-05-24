@@ -1,0 +1,30 @@
+name: 'Poetry and Python Setup'
+description: 'Installs Poetry and Python'
+inputs:
+  python_version:
+    description: 'The Python version to use'
+    required: false
+    default: '3.11'
+    type: string
+  poetry_version:
+    description: 'The Poetry version to use'
+    required: false
+    default: '1.6.1'
+    type: string
+  python_cache:
+    description: 'Which dependencies to cache'
+    required: false
+    default: 'poetry'
+    type: string
+runs:
+  using: "composite"
+  steps:
+    - name: Install Poetry
+      run: pipx install poetry==${{ inputs.poetry_version }}
+      shell: bash
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python_version }}
+        cache: ${{ inputs.python_cache }}
+    

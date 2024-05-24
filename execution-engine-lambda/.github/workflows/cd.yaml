@@ -1,0 +1,124 @@
+name: "Deploy Infrastructure"
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy-to-dev:
+    runs-on: ubuntu-latest
+    env:
+      CDK_DEFAULT_ACCOUNT: 439101250057
+      CDK_DEFAULT_REGION: us-east-1
+      DEPLOY_ENVIRONMENT: dev
+      STATE_MACHINE_ARN: arn:aws:states:us-east-1:439101250057:stateMachine:ExecutionEngineStateMachine
+    environment: development
+    permissions:
+      contents: "read"
+      id-token: "write"
+    outputs:
+      deployment-version: ${{ steps.deployment-version.outputs.PACKAGE_VERSION }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/setup-python-and-poetry@master
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::439101250057:role/github-actions-dev-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 900
+          
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and Push Image for Execution Engine Lambda
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: preloop-execution-engine-lambda
+          IMAGE_TAG: latest
+          LAMBDA_FUNCTION_NAME: ExecutionEngineLambda
+          PRELOOP_API_ENDPOINT: http://internal-BackEn-BackE-9BBP4oxxZLpS-305300445.us-east-1.elb.amazonaws.com
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          --build-arg DEPLOY_ENVIRONMENT=$DEPLOY_ENVIRONMENT \
+          --build-arg AWS_DEFAULT_REGION=$CDK_DEFAULT_REGION \
+          --build-arg AWS_ACCOUNT_ID=$CDK_DEFAULT_ACCOUNT \
+          --build-arg STATE_MACHINE_ARN_BUILD=${STATE_MACHINE_ARN} \
+          --build-arg PRELOOP_API_ENDPOINT=$PRELOOP_API_ENDPOINT .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          aws lambda update-function-code --function-name $LAMBDA_FUNCTION_NAME --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:latest
+      
+      - name: Get Deployment Version
+        id: deployment-version
+        run: echo "PACKAGE_VERSION=$(poetry version --short)" >> "$GITHUB_OUTPUT"
+        working-directory: .
+        shell: bash
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [deploy-to-dev]
+    permissions:
+      contents: "write"
+      id-token: "write"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/create-release@master
+        with:
+          gh_bot_token: ${{ secrets.PRELOOP_BOT_TOKEN }}
+          package_version: ${{ needs.deploy-to-dev.outputs.deployment-version }}
+  
+  deploy-to-prod:
+    runs-on: ubuntu-latest
+    env:
+      CDK_DEFAULT_ACCOUNT: 695168008693
+      CDK_DEFAULT_REGION: us-east-1
+      DEPLOY_ENVIRONMENT: prod
+      STATE_MACHINE_ARN: arn:aws:states:us-east-1:695168008693:stateMachine:ExecutionEngineStateMachine
+    needs: [create-release]
+    environment: production
+    permissions:
+      contents: "read"
+      id-token: "write"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: preloop/devops/.github/actions/setup-python-and-poetry@master
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-1" # change to appropriate region
+          role-to-assume: "arn:aws:iam::695168008693:role/github-actions-prod-role"
+          role-session-name: "RepoPublishPackage"
+          role-duration-seconds: 900
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and Push Image for Execution Engine Lambda
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: preloop-execution-engine-lambda
+          IMAGE_TAG: latest
+          LAMBDA_FUNCTION_NAME: ExecutionEngineLambda
+          PRELOOP_API_ENDPOINT: http://internal-BackEn-BackE-UYcz94GdC4wa-1418473385.us-east-1.elb.amazonaws.com
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          --build-arg DEPLOY_ENVIRONMENT=$DEPLOY_ENVIRONMENT \
+          --build-arg AWS_DEFAULT_REGION=$CDK_DEFAULT_REGION \
+          --build-arg AWS_ACCOUNT_ID=$CDK_DEFAULT_ACCOUNT \
+          --build-arg STATE_MACHINE_ARN_BUILD=${STATE_MACHINE_ARN} \
+          --build-arg PRELOOP_API_ENDPOINT=$PRELOOP_API_ENDPOINT .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          aws lambda update-function-code --function-name $LAMBDA_FUNCTION_NAME --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:latest
